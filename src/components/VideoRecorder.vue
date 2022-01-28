@@ -1,6 +1,14 @@
 <template>
   <div>
-    <video ref="videoRec" class="camera" muted loop controls autoplay />
+    <video
+      ref="videoRec"
+      :srcObject.prop="stream"
+      class="camera"
+      muted
+      loop
+      controls
+      autoplay
+    />
     <br />
     <video ref="videoPlay" class="camera" muted loop controls autoplay />
     <br />
@@ -28,6 +36,7 @@ export default {
       videoUrl: null,
       isValid: true,
       stream: undefined,
+      blob: undefined,
       recorder: undefined,
       chunks: [],
       ready: false,
@@ -99,9 +108,7 @@ export default {
       request.onsuccess = () => {
         if (request.result) {
           console.log("taking videos from IDB", request.result);
-          this.$refs.videoPlay.src = window.URL.createObjectURL(
-            request.result.video
-          );
+          this.blob = window.URL.createObjectURL(request.result.video);
         } else {
           console.log("not in the db");
         }
@@ -111,15 +118,12 @@ export default {
     gotStream(mediaStream) {
       console.log("got stream", mediaStream);
       this.stream = mediaStream;
-      this.recorder = new MediaRecorder(mediaStream, {
-        mimeType: "video/webm",
-        audioBitsPerSecond: 128000,
-      });
+      this.recorder = new MediaRecorder(mediaStream);
       this.recorder.ondataavailable = this.videoRecorderDataHandler;
       this.recorder.onstop = this.videoRecorderStopHandler;
       console.log(this.$refs.videoRec);
-      this.$refs.videoRec.src = null;
-      this.$refs.videoRec.srcObject = mediaStream;
+      // this.$refs.videoRec.src = null;
+      // this.$refs.videoRec.srcObject = mediaStream;
       this.ready = true;
     },
     videoRecorderDataHandler(event) {
@@ -127,7 +131,7 @@ export default {
       console.log(event);
     },
     videoRecorderStopHandler() {
-      const blob = new Blob(this.chunks, { type: "video/webm" });
+      const blob = new Blob(this.chunks, { type: this.recorder.mimeType });
       console.log("Stopped!", blob);
       this.$refs.videoPlay.src = window.URL.createObjectURL(blob);
 
@@ -143,7 +147,7 @@ export default {
         name: "video",
       };
 
-      let request = objectStore.add(record);
+      let request = objectStore.put(record);
       request.onsuccess = function () {
         console.log("Record addition attempt finished");
       };
@@ -158,14 +162,15 @@ export default {
       this.recording = true;
       this.recordingReady = false;
       this.startTime = new Date().getTime();
+      this.endTime = 0;
     },
     stopRecording() {
       this.recorder.stop();
       this.endTime = new Date().getTime();
     },
     saveRecording() {
-      const blob = new Blob(this.chunks, { type: "video/webm" });
-      saveAs(blob, "video.webm");
+      const blob = new Blob(this.chunks, { type: this.recorder.mimeType });
+      saveAs(blob, `video.webm`);
     },
   },
 };
